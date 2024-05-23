@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
@@ -25,10 +26,56 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
+    const userCollection = client.db("FoodHub").collection("users");
     const menuCollection = client.db("FoodHub").collection("menu");
     const reviewCollection = client.db("FoodHub").collection("reviews");
     const cartCollection = client.db("FoodHub").collection("carts");
 
+    // users related api
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      // insert email if user doesnt exist:
+      // you can do this many way (1. email unique, 2. upsert, 3.simple checking)
+      const query = { email: user.email };
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "user already exist", insertedId: null });
+      }
+
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    // user load
+    app.get("/users", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
+    // make admin
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc)
+      res.send(result)
+    });
+
+
+
+    // user delete
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await userCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // menu related api
     app.get("/menu", async (req, res) => {
       const result = await menuCollection.find().toArray();
       res.send(result);
@@ -54,27 +101,13 @@ async function run() {
       res.send(result);
     });
 
-    // delete ny add cart 
-    app.delete('/carts/:id', async(req, res) => {
+    // delete ny add cart
+    app.delete("/carts/:id", async (req, res) => {
       const id = req.params.id;
-      const query= {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) };
       const result = await cartCollection.deleteOne(query);
-      res.send(result)
-
-    })
-
-
-
-
-
-
-
-
-
-
-
-
-
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
